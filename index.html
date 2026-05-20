@@ -155,6 +155,10 @@ body{
 .mbtn{display:inline-flex;align-items:center;gap:3px;height:28px;padding:0 9px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;border-radius:6px;border:1px solid var(--s3);cursor:pointer;background:transparent;color:var(--dim);white-space:nowrap;transition:background .12s,color .12s,border-color .12s;-webkit-tap-highlight-color:transparent;}
 .mbtn:active{transform:scale(.92);}
 .mbtn-reset:hover{background:rgba(96,165,250,.1);color:var(--info);border-color:rgba(96,165,250,.3);}
+.mbtn-copy:hover{background:rgba(52,211,153,.1);color:var(--ok);border-color:rgba(52,211,153,.3);}
+.mbtn-copy.copied{background:rgba(52,211,153,.15);color:var(--ok);border-color:rgba(52,211,153,.4);}
+#btn-raw-code.active{background:rgba(167,139,250,.15);color:var(--purple);border-color:rgba(167,139,250,.4);}
+#raw-code-wrap{display:none;}
 .mbtn-del{padding:0 8px;}
 .mbtn-del:hover{background:rgba(248,113,113,.12);color:var(--danger);border-color:rgba(248,113,113,.3);}
 .cbtn{background:transparent;border:none;cursor:pointer;color:var(--dim);padding:2px 5px;font-size:15px;line-height:1;transition:color .12s,transform .2s;-webkit-tap-highlight-color:transparent;flex-shrink:0;}
@@ -247,7 +251,6 @@ body{
     <span class="logo-tag">Análise Semântica</span>
   </div>
   <div id="hdr-r">
-    <span id="status-pill">Pronto</span>
     <button class="btn btn-g btn-xs" onclick="copyAll()" title="Copiar HTML">
       <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       <span class="hidden sm:inline">Copiar</span>
@@ -302,7 +305,11 @@ body{
         <div class="tl" style="background:#28c840;"></div>
         <span style="margin-left:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);">preview.html</span>
       </div>
-      <span id="prev-status" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);">— não renderizado —</span>
+      <!-- Botão Ver Código Completo — alterna entre preview e editor de código bruto -->
+      <button id="btn-raw-code" onclick="toggleRawCode()" class="btn btn-g btn-xs" style="font-size:11px;gap:5px;" title="Ver e editar o HTML completo montado">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4M9 3l-2 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Código completo
+      </button>
     </div>
     <div id="prev-wrap">
       <div id="prev-empty">
@@ -313,6 +320,23 @@ body{
         </div>
       </div>
       <iframe id="prev-iframe" title="Preview HTML"></iframe>
+      <!-- Editor de código completo — ativado pelo botão "Código completo" -->
+      <div id="raw-code-wrap" style="display:none;position:absolute;inset:0;z-index:3;display:none;flex-direction:column;background:var(--bg);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--s1);border-bottom:1px solid var(--s3);flex-shrink:0;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);">Editando: HTML completo montado</span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-g btn-xs" onclick="applyRawCode()" title="Aplicar edições e re-renderizar">
+              <svg width="11" height="11" viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11" fill="currentColor"/></svg>
+              Aplicar
+            </button>
+          </div>
+        </div>
+        <textarea id="raw-code-ta"
+          style="flex:1;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.65;background:var(--bg);color:#b8c0dc;border:none;outline:none;padding:14px 16px;resize:none;width:100%;height:100%;"
+          spellcheck="false" autocorrect="off" autocapitalize="off"
+          placeholder="O código completo aparecerá aqui quando você clicar em 'Código completo'..."
+        ></textarea>
+      </div>
     </div>
   </div>
 </div>
@@ -642,6 +666,9 @@ function renderModules() {
       </div>
     </div>
     <div class="mact">
+      <button class="mbtn mbtn-copy" onclick="copyMod('${sec.id}',${i})" title="Copiar HTML deste bloco">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
       <button class="mbtn mbtn-reset" onclick="resetMod('${sec.id}',${i})" title="Restaurar original">
         <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 1 0 1-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M3 3v3h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -705,6 +732,89 @@ function resetMod(secId, idx) {
   const mod = APP.sections.get(secId)?.modules[idx]; if (!mod) return;
   mod.currentHTML = mod.originalHTML;
   renderAll(); saveState(); showToast(`↩ "${mod.nome}" restaurado`);
+}
+
+/* Copiar HTML de um único módulo */
+async function copyMod(secId, idx) {
+  const mod = APP.sections.get(secId)?.modules[idx]; if (!mod) return;
+  const html = mod.currentHTML || mod.originalHTML;
+  try { await navigator.clipboard.writeText(html); }
+  catch { fallbackCopy(html); }
+  // feedback visual no botão
+  const btn = document.querySelector(`#mc-${secId}-${idx} .mbtn-copy`);
+  if (btn) {
+    btn.classList.add('copied');
+    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+    }, 1600);
+  }
+  showToast(`📋 "${mod.nome}" copiado!`);
+}
+
+/* Alternar entre preview e editor de código completo */
+function toggleRawCode() {
+  const rawWrap = document.getElementById('raw-code-wrap');
+  const iframe  = document.getElementById('prev-iframe');
+  const empty   = document.getElementById('prev-empty');
+  const btn     = document.getElementById('btn-raw-code');
+  const isOpen  = rawWrap.style.display === 'flex';
+
+  if (isOpen) {
+    // fechar — volta para preview
+    rawWrap.style.display = 'none';
+    btn.classList.remove('active');
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4M9 3l-2 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Código completo`;
+  } else {
+    // abrir — monta HTML e coloca no textarea
+    const sec = APP.sections.get(APP.activeId);
+    if (!sec) { showToast('⚠ Nenhuma seção ativa'); return; }
+    const html = buildFinalHTML(sec);
+    const ta = document.getElementById('raw-code-ta');
+    ta.value = html;
+    // esconde iframe e empty, mostra o editor
+    iframe.style.display = 'none';
+    empty.style.display  = 'none';
+    rawWrap.style.display = 'flex';
+    btn.classList.add('active');
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4M9 3l-2 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> ← Preview`;
+    // tab indenta no editor de código
+    ta.onkeydown = (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const s = ta.selectionStart, end = ta.selectionEnd;
+        ta.value = ta.value.substring(0,s) + '  ' + ta.value.substring(end);
+        ta.selectionStart = ta.selectionEnd = s + 2;
+      }
+    };
+  }
+}
+
+/* Aplica o código bruto editado: re-parseia e re-renderiza */
+function applyRawCode() {
+  const sec = APP.sections.get(APP.activeId); if (!sec) return;
+  const ta  = document.getElementById('raw-code-ta');
+  const newHTML = ta.value.trim();
+  if (!newHTML) { showToast('⚠ Código vazio'); return; }
+
+  // Atualiza o rawHTML da seção e re-parseia
+  sec.rawHTML = newHTML;
+  const res = parseHTML(newHTML);
+  sec.parsedDoc = res.parsedDoc;
+  sec.strategy  = res.strategy;
+  // Preserva edições dos módulos que já existiam (por nome)
+  const oldMap = new Map(sec.modules.map(m => [m.nome, m.currentHTML]));
+  sec.modules = res.modules.map(m => ({
+    ...m,
+    currentHTML: oldMap.has(m.nome) ? oldMap.get(m.nome) : m.originalHTML
+  }));
+
+  // Fecha o modo código e renderiza
+  toggleRawCode();
+  renderAll(); saveState();
+  setTimeout(() => runPreview(), 100);
+  showToast('✅ Código aplicado e re-analisado!');
 }
 function removeMod(secId, idx) {
   const sec = APP.sections.get(secId); if (!sec) return;
@@ -880,8 +990,7 @@ function runPreview() {
     iframe.srcdoc = html; iframe.style.display = 'block';
     document.getElementById('prev-empty').style.display = 'none';
     const now = new Date().toLocaleTimeString('pt-BR');
-    document.getElementById('prev-status').textContent = `Renderizado às ${now}`;
-    setStatus(`Preview · ${now}`);
+    document.getElementById('prev-status') && (document.getElementById('prev-status').textContent = `Renderizado às ${now}`);
     renderTabs(); showToast('✅ Preview renderizado!');
     if (window.innerWidth <= 768) mobTab('preview');
   } catch(e) { showToast('❌ Erro ao montar HTML'); console.error(e); }
